@@ -1,0 +1,362 @@
+---
+title: "R programming: Aplicado a Covid-19 en Colombia"
+author: "Jose Luis Lopez Guevara"
+date: "29/6/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+[Link del código](https://github.com/Jose230600/Repaso-de-R-Programming-Aplicado-a-Covid-19-En-Colombia)
+
+```{r,echo=FALSE,results='hide'}
+ horainicial <-Sys.time()
+ horainicial
+```
+
+# Objetivo 
+
+El objetivo principal de este documento simplemente es **poner en práctica** ciertas funciones que aprendí en el curso de R programming dado en Coursera por parte de la universidad John hopkins university.
+
+## Sobre el data set
+
+El data set es un conjunto de datos que encontré en *kaggle* al cual se puede acceder en el siguiente link [Data set](https://www.kaggle.com/camesruiz/colombia-covid19-complete-dataset?select=Casos1.csv) y descargar en fomarto csv, el cual básicamente describe ciertas variables como la ciudad,departamento,estado del paciente,etc... y esto por un periodo de tiempo desde la llegada del virus al país, aun asi dejaré los datos en el repositorio para que puedan ser descargados directamente.
+
+### Lectura
+
+Para la lectura del archivo es necesario encontrarce en el mismo directorio o carpeta en donde se encuentra el archivo a leer, para ello se puede utilizar el comando `setwd()`
+
+```{r}
+ setwd("D:/econimoia 2/Big data/Proyectos/Data science R/R programming/Repaso-de-R-Programming")
+```
+Una ves hecho lo anterior se puede revisar que efectivamente este el archivo en nuestro directorio con el comando `dir()`o `list.files`
+
+```{r}
+ dir()
+```
+De lo anterior se observa que efectiamente nuestro archivo "Casos1.csv" se encuentra en nuestro directorio ademas de este mismo archivo.Rmd ya que realizo todo en una carpeta sujeta a version control mediante git
+
+Una ves comprobado lo anterior podemos leer nuestros datos, donde para ello si fuera un data set de mayor tamaño se podría **estimar** el peso que este ocuparía¡ en nuestra RAM, donde para ello tenemos en cuenta el numero de filas y columnas, donde de la página en *Kaggle* podemos observar que el dataset contiene 1161 filas y 9 columnas donde 2 de ellas son de tipo entero (edad y id)las cuales consumen 4bytes [fuente](https://docs.oracle.com/cd/E19253-01/819-6957/chp-typeopexpr-2/index.html) y para el resto de columnas de tipo caracter 1 byte por cada caracter, donde si decimos que cada registro  tiene unos 10 caracteres, el tamaño estimado sería de 1161 * 2 * 4 + 1161 * 7 * 10 osea 90558 bytes lo cual dividido en 2^20 nos daría unos 0.086MB lo cual serían unos 86KB
+
+En el siguiente código leo los datos rapidamente mediante la función `read.csv()` y se la asigno a un objeto llamado *data* mediante el operador `<-` despues mediante la función `object.size()`se estima también el peso del archivo en memoria y despues mediante la función `print()`especifico que muestre el resultado con el argumento `units = "auto"` para asi mostrar el resultado directamente en KB; además de ello cabe resaltar que los datos de nuestro archivo original no se ven modificados ya que la función `read.csv()`lo que hace es abrir una conección de solo lectura y al leer los datos cierra la conección dejando asi libre el archivo
+```{r}
+ data <- read.csv("Casos1.csv")
+ object.size(data)
+ print(object.size(data), units = "auto")
+```
+Cabe resaltar que al ser tan pequeño el dataset, simplemente con leer mediante la función base de R `read.csv()`es suficiente, sin embargo en caso de tener un dataset mucho mas grande se podría optimizar esta función especificando atributos como `comment.char=""`especificar el numero de filas que ya conociamos con el atributo `nrow=1161`, especificarle si tenía encabezados con `header=TRUE`y especialmente especificarle el tipo de datos de las columnas con el atributo `colclasses` donde a este último se le podía pasar un vector de tipo caracter con los nombres de las classes del dataset, para ello se podía haber leido primero la data unas 5 filas especificandole  `nrow=5`y aplicarle a cada columna la función  `class()`para ello se podría utilizar la función  `sapply(data,class) `(que nos entrega directamente un vector si los resultados tienen la misma dimensión, en caso que no, nos entregaría el mismo resultado de `lappy()`que sería una lista, aun asi en cualquier caso se puede utilizar la función `vapply()`que realiza lo mismo, solo que podemos especificarle el tipo de retorno que esperamos) la cual cogeria cada elemento de la lista(la tabla podría interpretarce como una lista donde cada elemnto tiene la misma longitud)y cada elemento le aplica la función  `class() `, despues este resultado se pdoría asignar a un objeto y este objeto a este atributo y asi hacer que la lectura sea aun mas rápida, además de ello en caso de querer más rápida aun la lectura se podría utilizar las funciones del paquete  `readr`
+
+##Observaciones principales
+
+Una ves leida la data, se procede a observarla mediante la función  `head() ` y posteriormente se buscan caracteristicas básicas como el numero de filas  o registros, la cantidad de columnas, los tipos de datos y demás, para ello la función `str()`nos provee esta descripción de manera rápida
+
+```{r}
+head(data,5)
+# mediante este operador se realizan los comentarios, se observa en los datos que el primer regitro fue una mujer de 19 aÃ±os de edad que era de tipo importado y que aun asi de ser el primer caso, el primer contagio registrado por parte de la importaciÃ³n del virus fue el cuarto registro, afectando a un hombre de antioquia  el cual se podria decir que su contagio fue causa del 3 caso que fue el primero en llegar a antioquia por parte de una espaÃ±ola
+ str(data)
+```
+mediante esta función `str()`se observa información de diferentes funciones como `names()` al indicarnos los nombres de las columnas, la función `class()`al indicarnos el tipo de dato que tienen las columnas, donde la segunda variable realmente es un tipo `Date`y no caracter sin embargo R lo lee asi ya que no se encuentra en el formato que R entiende las fechas, también se observa el número de filas `nrow()`y el número de columnas `ncol()` que también se podían obtener mediante `dim()`,sin embargo mirando mas especificamente las fechas de diagnostico pueden variar en el mismo dia por lo que no se sabe a simple vista hasta que fecha llegan los datos recogidos, por lo que mediante la función `tail()`se puede mirar las ultimas filas del dataset
+
+```{r}
+tail(data)
+```
+Observando lo anterior, se observa que la última fecha de la que hay registro es del 02/04/2020 y sabiendo que la primera era 06/03/2020, se puede decir que aproximadamente se tomaron datos por el primer mes de la pandemia, sin embargo mas adelante se sabra exactamente cuanto tiempo fue.
+
+## Primeras modificaciones a los datos
+
+Ahora habiendo entendio los datos que tenemos, podriamos empezar a mirar cuantas categorías hay regsitradas para alguna variable mediante la función `table(), sin embargo para ello sería mas adecuado convertir algunas variables a factores para asi saber cuantos niveles de cada categoría hay, asi mismo para posterioemente tener un mejor manejo de gráficas.
+
+Para lo anterior convertiremos todas las variables caracteres a factores excepto la columna de fecha que esta será convertida a Date, para ello comenzaré con esto último, sin embargo los nombres del dataset prefiero cambiarlos un poco antes mediante la función  `names()`y la función `c()`donde estas se refieren a los nombres de algun objeto y a la creación de un vector respectivamente, aunque para esto último, esto tambien se podría realizar meidante la función `vector()`
+
+```{r}
+ names(data) <- c("ID","FechaDiagnostico","CiudadUbicacion","DepartamentoDistrito","Atencion","Edad","Sexo","TipoContagio","Pais procedencia")
+ head(data,3)
+```
+
+Ahora si continuando con la conversión de los tipos de las varaibles,para la conversión a tipo Date es necesario primero especifcar en que formato se encuentra nuestra data, como no recuerdo tales caracteres, mediante el operador `?`seguido de la función a utilizar, se accede a la docuemntación de R, donde para este caso la función `strptime()`contiene en su documentación en la parte de detalles los formatos de fechas, aun asi la función que utilizaré para la conversión del tipo de dato será `as.Date()`ya que en nuestros datos no se especifica ningun tipo de horas.
+, cabe resaltar que para poder acceder en este caso a la columna de fecha utilizo el operador `$`que necesita a su izquierda el dataset y a la derecha el nombre de la columna que vamos a operar, ademas de esto se podía haber escrito simplemente una F ya que el operardor por si solo hubiese buscado cual se ajustaba a la referencia y como solo hay una columna con este nombre hubiese servido.
+
+```{r}
+ #?strptime
+ data$FechaDiagnostico <- as.Date(data$FechaDiagnostic,format= "%d/%m/%Y")
+ str(data)
+```
+
+Observando lo anterior, se observa que ya se encuentra en tipo Date la columna de fecha de diagnostico, al tener esto ya podriamos saber exactamente cuantos dias fueron medidos, al poder este tipo de formato de fecha tratar las fechas como numeros double(para ello mediante la función `unclass()` podemos acceder al numero que R utiliza de esa fecha) por lo que podriamos restar la última fecha menos la primera lo cual sería la última componente del vector de fechas menos la primera,para ello accedemos a tales componentes mediante el operador de subconjuntos `[]`donde al ser solo vectores solo es necesario especificar la componente que deseamos 
+
+```{r}
+ data$FechaDiagnostico[1161]-data$FechaDiagnostico[1]
+```
+
+Observamos que los dias exactos estudiados fueron 27 dias de pandemia
+
+Ahora si continuamos con  el cambio de tipos del resto de columnas a factores para ello utilizare una función que toma como argumento un data frame y para cada columna revisa si es de tipo caracter y de ser asi la convierte a factor; cabe resaltar que esto se podia haber realizado mucho mas fácil leyendo directamente los datos con la opción de `stringsAsFactors`como true lo cual hubiese hecho que ya todo fuera factor, sin embargo al estar la coluna Fecha en un formato incorrecto no se hubiese leido correctamente y tocaría solo transformar esa, sin embargo no lo híce para poder aplicar la creación de funciones aprendidas en el curso asi como otras funciones que utilizo ademas de ciclos y condicionales, siguiendo asi el objetivo de este proyecto
+
+```{r}
+ convertidorAfactores <- function(x){
+                for (i in 1:ncol(x)) {
+                        if (is.character(x[,i])) {
+                                x[,i] <- as.factor(x[,i])
+                        }
+                     
+                }
+         x
+ }
+ data <- convertidorAfactores(data)
+ str(data)
+ 
+ 
+```
+Me gustaria aclarar el funcionamiento de la función `convertidorAfactores()`donde esta toma un argumento `x`(donde este se podría especificar con un valor preestablecido especificando x= en los argumentos)y un ciclo `for(){}`se aplica desde 1 hasta(el operador `:` que permite crear una secuencia de numeros desde el numero de la izquierda del operador hasta el de la derecha) el numero de columnas de x donde en este caso al pasarle como argumento nuestra data que contiene nueve columnas(`ncol()`), el ciclo se aplicará 9 veces, y en cada iteración mediante un condicional `if(){}`revisa si es de tipo caracter la columna del data frame sub i que se este analizando, para esto utiliza la función `is,character()`y mediante el operador de subconjunto `[,i]`extraemmos de la matriz todas las filas y solo la columna sub i de la iteración, osea nos quedamos con un vector, posteriormente en caso que se cumpla esa condición, se le asigna el tipo factor mediante la función `as.factor()`, finalmente el resultado de tal función x se asigna al mismo objeto de data que teniamos; Notese tambien que dentro de la función creada utilice varias funciones lo cual permite R.
+
+Una ves realizado lo anterior, gracias a haber definido los tipos de las varaibles como factores, la función str ya nos entrega el recuento de los niveles de este tipo de objeto, lo cual a simple vista no se podía saber, ya que si miramos anteriormente al mirar solo las primeras o últimas columnas de los datos o la descripción inicial dada por la función `str()`, solp se podía identificar por ejemplo para la variable *atencion* que habian datos tipo recuperado y casa, sin embargo gracias a la conversión a factor se identifica que realmente hay 5 niveles donde la función `str()`inicialmente nos adiciona el nivel de fallecidos; para revisar todos los niveles se podría acceder a los niveles de cada factor, para ello sería más interesante crear una lista que nos indique los niveles de cada variable mediante la función `list()`y la función `levels()`; tambien podríamos obtener los niveles mediante la función `unique()`que elimnaría los datos duplicados y nos daría cada caterogría especifica
+
+```{r}
+ niveles <- list()
+ for(i in 1:9){niveles[[i]] <- levels(data[,i])}
+ niveles
+```
+Para lo anterior cabe resaltar que primero creé la lista vacía con la función `list()` y despues mediante un ciclo la lleno con la función `levels()`, notece que para poder asignar a la lista utilicé el operador que permite extraer subconjuntos de una lista `[[]]`
+
+Ahora revisandolos nos quedaremos con solo los niveles de ciudad y país, ya que especialmente en ciudad se ven datos redundantes como cali escrito en varias formas, y en cuanto a país el primer nivel es un "0" por lo que es necesario saber si tiene algun significado o se puede eliminar, esto para que posteriomente al realizar un recuento de cuantos datos corresponden a cada nivel no repitamos y se confunda el analisís
+
+
+```{r}
+ analizarCiudades <- niveles[[3]]
+ length(grep("[Cc][Aa][Ll][Ii]|^[Bb][Uu][Cc][Aa][Rr]",analizarCiudades))
+```
+
+En el código anterior, me quedo con los valores de la lista 3  que corresponden a ciudad, posteriormente creo un vector de caracteres llamado *"analizarCiudades"* y mediante la función `grep()`obtengo que componentes del vector  coinciden con la palabra "cali" ya sea en minusculas o mayusculas(para ello se utiliza el metacaracter `[Aa]`), o(mediante el operador `|`) cuales elementos coinciden con aquellos que empiecen(para ello el metacaracter `^`)con la frase "bucara" ya sea en mayusculas o minusculas , y observando el resultado mediante la función `length()`se ve que hay 5 elementos con estas caracteristicas, donde realmente deberian ser solo 2 uno que corresponda a cali y uno que corresponda a bucaramanga.
+
+Mediante la función `grepl()` podemos crear un vector lógico que nos de cuales componentes del vector corresponden a el patron anterioremnte analizado, por lo que creamos un subconjutno del vector y miramos a que valores corresponden estas inconsistencias; también mediante la función `regexpr()`en combinación con la función `regmatches()`podemos acceder exactamente a las cadenas que buscamos de texto, lo cual también se puede hacer con la función `regexec()`solo que esta última entregaría¡ una lista evaluando cada elemento que conincide con el patron buscado, también estas funciones se podrían utilizar con la función  `substr()`solo que junto con las posiciones en las que se cumple el patron seguido de el numero de caracteres que la cumplen se extraería lo necesitado
+
+```{r}
+ analizarCiudades[grepl("[Cc][Aa][Ll][Ii]|^[Bb][Uu][Cc][Aa][Rr]",analizarCiudades)]
+ r <- regexpr("[Cc][Aa][Ll][Ii]|^[Bb][Uu][Cc][Aa][Rr]",analizarCiudades)
+ regmatches(analizarCiudades,r)
+ #r2 <- regexec("[Cc][Aa][Ll][Ii]|^[Bb][Uu][Cc][Aa][Rr]",analizarCiudades)
+ #regmatches(analizarCiudades,r2)
+```
+Una ves claro lo anterior podemos utilizar la función `sub()`o `gsub()`para sustituir estos elementos por uno estandar que identifique a la ciudad, la unica diferencia entre las dos funciones es que `sub()`solo analiza un elemento a sustituir por lo que para sustituir *"BUCARAMANGA"* por *"Bucaramanga"* con `sub()` es suficiente, en cambio para cali al haber varias formas es necesario usar `gsub()`. despues de hacer tales reemplzamientos puedo modificar directamente los datos originales y ya que el objeto de niveles que sirvio para la identificación de tales problemas ya no es necesario lo puedo eliminar mediante la función `rm()` o `remove()`, cabe resaltar que al usar la función sub y gsub sobre el vector de ciudades del dataset,este convierte los datos a tipo caracter, por lo que es necesario volverlos a convertir a factor, donde ya podemos observar que solo hay un registro para *bucaramanga* y otro para *cali*
+```{r}
+ data$CiudadUbicacion <-sub("BUCARAMANGA","Bucaramanga",data$CiudadUbicacion)
+ data$CiudadUbicacion <-gsub("CALI|cali","Cali",data$CiudadUbicacion)
+ data$CiudadUbicacion <- as.factor(data$CiudadUbicacion)
+ rm(niveles)
+ head(levels(data$CiudadUbicacion),14)
+```
+Continuando con el país era interesante porque había un pas de valor "0" por lo que podemos primero saber cuantos valores se tienen de estos y posterioemnte revisar el registro, para ello utilizo la función `sum()` aplicada a un vector lógico (los TRUES son 1 y FALSES 0) que surge de saber cuales elementos del vector `data$Pais procedencia`son iguales a 0 y posteriormente mediante el operador de subconjunto me quedo con solo los registros que cumplan tales condiciones
+
+```{r}
+ sum(data$`Pais procedencia`=="0")
+ data[data$`Pais procedencia`=="0",]
+
+```
+
+Del código anterior observamos que solo hay 1 registro y lo observamos, sin embargo no tiene sentido por lo que lo eliminaré, para ello simplemente me quedo con el mismo dataframe exceptuando los registros que cumplen con ese tipo de país para ello utilizo el operador lógico `!` que significa diferente, y mediante la función `nrow()` compruebo que ha sido eliminado tal registro, sin embargo cabe resaltar que para eliminar el nivel de 0 del factor es necesario volver a convertir a caracter y ahi si a factor la variable
+```{r}
+ data <- data[!data$`Pais procedencia`=="0",]
+ nrow(data)
+ data$`Pais procedencia` <- as.character(data$`Pais procedencia`)
+ data$`Pais procedencia` <- as.factor(data$`Pais procedencia`)
+ levels(data$`Pais procedencia`)
+```
+##Algunos análisis descriptivos
+
+Recordar que el objetivo del análisis descriptivo según el anterior curso de **The Data Scientistâs Toolbox** es hacer resumenes generales de los datos y que no es para sacar cnclusiones hacerca de ellos.
+
+Una ves realizado lo anterior podemos crear un resumen de cuantos datos hay registrados para cada categoría mediante la función `table(), por ejemplo podriamos mirar cuantos casos en total hay por cada tipo, ya sea en casa,en UCI...
+
+```{r}
+ table(data$Atencion)
+```
+Observando lo anterior se puede observar que para el periodo de datos recolectados 954 corresponden a casa siendo asi la mayor parte de los datos, y la menor la cantidad de fallecidos con 19, y teniendo en cuenta que sabiamos que fueron 27 dias  de medición, podemos ver que en 27 dias solo habían 19 muertos, caso contrario al actual donde cada dia hay alrededor de 700, suiendo un año y mas despues en el que hago este escrito.
+
+Mediante la función `table()` también podemos comparar estos datos respecto mas variables, por ejemplo a cuantos de estos tipos de atención les corresponde a cada ciudad como por ejemplo para **RESPONDERNOS LA PREGUNTA**(*clave en ciencia de datos*) de cual ciudad tiene la mayor cantidad de muertos para el periodo estudiado, para ello al ser tantas las ciudades podemos ordenar los datos mediante la función `order()`aunque tambien se podría realizar mediante la función `arrange()` del paquete `dplyr`, cabe también destacar que todos las formas de subconjuntos se pueden realizar mediante este paquete sin embargo estoy mas relacionado a las funciones base de R, ya que además en este curso este paquete realmente no se enseña sino hasta el curso de *Reproducible research*
+
+```{r}
+ estudio <-table(data$CiudadUbicacion,data$Atencion)
+ head(estudio[order(estudio[,2],estudio[,4],decreasing = TRUE),],5)
+ #args(order)
+
+```
+En el código anterior, cabe resaltar que el resultado de `table()`no es un tipo *data frame* por lo que no se puede utilizar el operador `$`para hacer subconjuntos, sino solo el básico `[]`; lo que hago es mostrar solo las 5 primeras líneas de el resultado de `table()`ordenando de mayor a menor principalmente por la columna dos de estudio que corresponde a *fallecidos* y despues por la columna 4 que corresponde a enfermos en UCI;Se resalta que para especificar el atributo`decreasing= TRUE`este tiene que llamarce con el nombre exacto ya que si escribimos el nombre incompleto este  no lo reconoce, esto es debido a que si miramos los argumentos de la función order con la función `args()`o con `formals()`observamos que el primer argumento es `...`el cual implica que la función no sabe que cantidad de vectores se quieren ordenar, por lo que el resto de argumentos para que la función los reconozca como el sentido decreciente, se tienen que especificar completamente
+
+Con el resultado podemos respondernos observando que Bogota es quien mas fallecidos tiene para el periodo estudiado, seguido de cali.
+
+Poriamos continuar de la misma forma comparando cualquier variable que queramos incluso en 3 dimensiones o mas con el siguiente código que no ejecutaré, que muestra para cada tipo de contagia cada correspondencia de tipos de atención para cada ciudad.
+
+```{r}
+#table(data$CiudadUbicacion,data$Atencion,data$TipoContagio)
+```
+También se podría crear una nueva variable para ser analizada que combine dos factores para asi visualizar lo que anteriormente mencione de utilizar la función `table()`, para ello creamos un factor que nos dirá que tipos de datos son por ejemplo de tipo importado y sexo femenino osea cuantas extranjeras son casos de covid y cuantos extranjeros o asi, para ello podemos utilizar la función `interaction()`, y simplemente mediante el operador `$`relacionado a nuestro dataset, junto con el nombre de la columna que deseamos como nueva asignamos el resultado (esto tambien se podría realizar con la función `mutate()`del paquete `dplyr`); esto tambien se podría realizar mediante la función `paste()`y despues los dos vectores a pegar, seguido de el tipo de separación que se quisiera con el argumento `sep="."`
+
+```{r}
+data$TipoDeCasoPorSexo <-interaction(data$TipoContagio,data$Sexo)
+table(data$TipoDeCasoPorSexo,data$Atencion)
+```
+con lo anterior nos podemos dar cuenta que por ejemplo hay 5 extranjeras para el periodo estudiado que se encuentran en UCI
+
+tambien podriamos revisar por cada sexo cuantos extranjeros hay en total para cada país 
+
+```{r}
+ estudio2 <-table(data$`Pais procedencia`,data$Sexo)
+ estudio2 <-estudio2[order(estudio2[,1], decreasing = T),]
+ head(estudio2[-1,],10)
+ 
+```
+Ahora se me ocurre preguntarnos si existe en los datos algún contagio de un niño, para ello se puede utilizar la función `any()`, despues podemos preguntarnos que registros son niños mediante la función `which()`y también podríamos preguntarnos si todos son menores de 90 o hay algún ciudadano mas mayor mediante la función `all()`
+
+```{r}
+ any(data$Edad<18)
+ which(data$Edad<18)
+ all(data$Edad>90)
+```
+Lo anterior también se podía haber realizado mediante la función `sum()` sumando aquellos que fueran menores a 18 lo cual si hay mas de uno nos daría cuantos.
+
+Tambien podemos añadir al análisis la creación de una columna llamada dia de la semana en la cual apartir de la fecha registrada escribimos el nombre del dia para asi despues agrupar para cada dia de la semana cuantos casos hay
+
+```{r}
+ data$Diadelasemana <- weekdays(data$FechaDiagnostico)
+ table(data$Diadelasemana)
+```
+
+observamos que para el periodo estudiado los martes es el mayor dia de casos registrados y el menor es el viernes, también se podría utilizar la función `months()` sin embargo no lo haré al no tener mucho sentido porque los datos solo corresponden a dos meses abril y marzo donde es claro que para marzo hay mas registros igual que con el caso de la función `quarters()`donde para el trimestre 1 habrian mas datos que para el 2
+
+Podemos realizar algunas medidas de tendencia central a la única variable cuantitiva que tenemos que es la edad de los pacientes para ello podemos utilizar la función `mean()` para el promedio, `sd()`para la desviación estandar o `median()`para la mediana,`range()`para mirar la menor y mayor edad de los datos estudiados o por separado utilizar `min()`o `max()`, los cuantiles mediante `quantile()`. En cualquier caso se puede utilizar `summary()`para hacer un resumen que tengan estos datos., en cualquier función en caso de tener algunos datos como `NA` esto se puede eliminar al establecer el atributo `na.rm=TRUE`.
+
+```{r}
+ mean(data$Edad)
+ sd(data$Edad)
+ median(data$Edad)
+ range(data$Edad)
+ max(data$Edad)
+ min(data$Edad)
+ quantile(data$Edad)
+ summary(data$Edad)
+```
+
+De lo anteror podemos observar que la edad promedio de los datos es aproximadamente 42(se podria utilizar la función `floor()`para obtener la parte entera del numero sin emabargo esta solo tomaría los enteros por debajo), y que la mínima edad corresponde a 0 años, esto puede ser porque hay casos de niños o bebes menores al año de edad, también vemos que la máxima edad es de 88 años, y que el 75% de las personas registradas se encuentran por debajo de 54 años de edad.
+
+ahora sería interesante relizar estos mismos calculos pero respecto a alguna categoría en especifico para ello se puede utilizar la función `tapply()`o la función `split()` en conjunto con las funciones `lapply()`,`sapply()`,`vapply()`que nombre anteriormente., en caso de usar la primera esta lo que hace es que toma un vector al que le queremos hacer algún cálculo (en nuestro caso la edad)y hace tal cálculo respecto a cada categoría de otro vector(podría ser sexo)y despues le decimos que función aplicar y también se puede especificar el argumento `simplify=T`para buscar algún resultado como `sapply()`; en caso de utilizarce la segunda combinación, `split()` dividiría el data frame por cada categoría(como sexo)y al pasarle esa lista a las otras funciones estas sabrían que a esa división deben aplicarle alguna función, en este caso utilizaré `tapply()`
+
+```{r}
+ tapply(data$Edad,data$Sexo,mean)
+ tapply(data$Edad,data$Sexo,median)
+ tapply(data$Edad,data$Sexo,range)
+```
+Observamos que el promedio es muy parecido sin embargo mediante la mediana observamos que las mujeres registradas son mayores;tambien vemos que la mujer mayor es de 85 años
+
+también se puede escribir lo anterior con la función `with()`donde el primer argumento sería los datos y el segundo la función `tapplyI()`pero sin necesidad de usar el operador `$`). 
+
+también podemos resumir respecto el tipo de atención el rango de edades
+
+```{r}
+ tapply(data$Edad,data$Atencion,range)
+```
+
+obervamos que de fallecidos hay una persona de 19 años, y el de mayor edad 88 también es de estado fallecido, también observamos que en casa hay algun menor de 12 meses, y también algun señor de la máxima edad de 88.
+
+Cabe resaltar dentro de las funciones *apply* que también esta la función `apply()`que tomaría una dimensión especificada de algún con junto de datos y le aplicaría a esa dimensión la función que queramos, a partir de esta surgen todas las funciones como `colMeans()`,`rowMeans()`y demás, aca no tiene mucho sentido usarla, y la otra es `mapply()` que básicamente realiza lo mismo que las `lapply()` solo que esta permite que se aplique una función a varias listas, es como si tuvieramos varios conjuntos de datos y se les desee aplaicar algo a todos
+
+## cierto analisis exploratorio
+
+Sería bueno mencionar que realmente esto corresponde al curso 5 *exploratory data analÃ­sis*(lo realizo aca ya que también utilizo temas que se trataron en el libro guia del curso R programming)[Consultar aqui](https://bookdown.org/rdpeng/rprogdatascience/) y el objetivo de este es revisar si hay algún tipo de relación entre nuestras variables y formular algunas hipotesis, sin embargo que haya depronto algún tipo de correlación no implica que una variable cause otra.
+
+Poriamos empezar con un histograma de alguna variable cuantitativa, para ello se utiliza la función `hist()` y observamos los datos que anteriormente habiamos visto con las funciones mean, range y demás; lo mas importante del histograma es realmente saber a que distrubución se ajustan los datos para asi posteriormente establecer el comportamiento y realizar algunas conclusiones de los datos, sin embargo eso se hará en proximos proyectos.
+
+```{r}
+hist(data$Edad)
+```
+
+Podriamos comparar estas medidas entre grupos mediante diagramas de cajas y bigotes con la función `boxplot()`
+
+```{r}
+boxplot(data$Edad~data$Atencion)
+```
+
+De lo anterior podemos observar las diferentes medidas, podemos ver que los valores de atención de casa tienen unos cuantos valores atípicos , sin emabrgo sería mas interesante ordenar estos factores por grado de severidad siendo el mas grave fallecido y el menos recuperado *por plantear algo, no queire decir que tenga sentido :)* para ello cambiamos los niveles de la variable al especificarlos yo en el orden que deseo.
+
+```{r}
+GradoDeSeveridad <-factor(as.character(data$Atencion),levels = c("Recuperado","Casa","Hospital","Hospital UCI","Fallecido"))
+boxplot(data$Edad~GradoDeSeveridad)
+```
+
+De lo anterior se observa que **PARECE** que a medida que aumenta el promedio de edad, aumenta la severidad del caso.
+
+ahora mediante la función `plot()`podriamos observar la cantidad de casos que cada ves van sucediendo respecto a la edad del paciente
+
+```{r,results="hide"}
+ plot(data$FechaDiagnostico,data$Edad)
+```
+
+Claramente se ve que a medida de que pasa el tiempo hay mas casos, se observa que el primer caso fue de alguien de 19 años, despues dos casos de entre 25 y 50 años aproximandamente y asi, ahora podríamos agregar una línea que indique el promedio de edad mediante la función `abline()` , especifiancole el valor de `h`para decirle que es un valor del eje y podemos agregarle algún color con el paramentro `col`, además de ello seria interesante diferenciar los grupos de personas segun algun factor por ejemplo hombres y mujeres, para ello mediante la función `points` se agregan datos.
+
+```{r}
+hombres <- data[data$Sexo=="M",]
+mujeres <- data[data$Sexo=="F",]
+rangoGlobaldeEdad <- range(hombres$Edad,mujeres$Edad)
+ragnoGlobaldeFecha <-range(hombres$FechaDiagnostico,mujeres$FechaDiagnostico)
+plot(hombres$FechaDiagnostico,hombres$Edad,ylim=rangoGlobaldeEdad,xlim=ragnoGlobaldeFecha,col="green",pch=5,main = "Primeros contagios en Colombia",sub = "Primeros 27 dias",xlab="Fecha",ylab="Edad")
+abline(h=mean(hombres$Edad),col="green")
+points(mujeres$FechaDiagnostico,mujeres$Edad,col="red",pch=6)
+abline(h=mean(mujeres$Edad),col="red")
+```
+
+Me gustaria aclarar el anterior código, primero separo el conjunto de datos por hombres y mujeres, para asi priemero graficar los hombres y posteriormente las mujeres, sin embargo dado que las fechas para cada caso es diferente, si se graficara directamente el vector de fechas del conjunto de hombres, pues posteriormente al agregar los puntos de los datos de mujeres, algunos de estos se omitirían, por ello es necesario sacar el rango de fechas totales para especificar que la gráfica tenga ese eje x, para ello saco el rango y mediante el parametro  `xlim` se especifica que de tal rango queremos que sea la longitud del eje x. para las edades realizo el mismo procedimiento pero especificando el eje y con `ylim`, especifico el color `col`a verde,la figura para que no sea un punto, especifico `pch`igual a 5 que corresponde a esos rombos.Para consultar las diferentes formulas solo es necesario consultar la documentanción de pch directamente, posteriormente mediante `main` y  `sub` agrego el titulo y subtitulos respectivos y mediante `xlab`y `ylab`los diferentes nombres a los ejes, posteriormente mediante `points` agrego los datos de las mujeres y cambio la figura y el color, y finalmente agrego el promedio de edad de mujeres.
+
+De lo anterior básicamente se observa que no existe una separación de edades por sexo, por si se planteara que a los hombres si son mayores se contagian mas o si una mujer siendo menor se contagia menos o cosas asi, lo otro es que se obsrva que el promedio de mujeres es mayor al de hombres como ya les había hablado anteriormente.
+
+lo anterior tambien se podría realizar pero mediante dos gráficas observadas al mismo tiempo, para ello se puede fijar mediante la función `par`junto con su parametro `mfrow` especificando que quremos 1 fila de graficas con 2 columnas de gráficas
+
+```{r}
+par(mfrow=c(1,2))
+hombres <- data[data$Sexo=="M",]
+mujeres <- data[data$Sexo=="F",]
+plot(hombres$FechaDiagnostico,hombres$Edad,col="blue",pch=5,main = "Primeros Contagios Hombres",sub = "Primeros 27 dias",xlab="Fecha",ylab="Edad")
+abline(h=mean(hombres$Edad),col="blue")
+plot(mujeres$FechaDiagnostico,mujeres$Edad,col="pink",pch=6,main = "Primeros contagios Mujeres",sub = "Primeros 27 dias",xlab="Fecha",ylab="Edad")
+abline(h=mean(mujeres$Edad),col="pink")
+```
+
+
+## Guardando los datos preparados
+
+Ahora que he realizado cierto analisis con los datos se puede guardar el data frame utilizado con las clases de las varaibles definidas como date, entero factores y demás, asi mimso como su tratamiento de quitar aquellos valores extraños como lo de cali varias veces y demás, para ello esto se puede realizar de diferentes maneras para conservar la integridad del archivo en el siguiente código se observan varias formas, cabe resaltar que no utilizo `write.table()`o `wite.csv()`ya que para poder leerlo tendría que especificar los tipos de las clases como factores y eso, al utilizar las siguientes funciones guardo exactamente los tipos factores y demás y al leerlos obtengo exactamente los datos como los guarde no tengo que especificar tipos de columnas ni nada.
+
+```{r}
+ dput(data,file = "AssciData.R")
+ #leer el anterior 
+ dataR <- dget("AssciData.R")
+ str(data)
+ save(data,file = "BynaryData.rda")
+ #leer el anterior 
+ datarda <- load("BynaryData.rda")
+```
+Tambien podemos guardar ciertos objetos que creamos mediante `dump()`, la unica diferencia a `dput()`es que `dump()`permite guardar varios objetos al mismo tiempo, ya que si miramos `args()` de cada función veremos que `dump()` permite una lista como argumento, en cambio `dput()`solo un objeto x, cabe destacar que de la función anteriomente usada `save()`esta permite varios objetos al mismo tiempo, ya que ademas si se requieren guardar todos los objetos que creamos se puede utilizar la función `save.image()` y podemos consultarlos mediante `ls()`, tambien se resalta que para `save()`o `save.image()` se puede utilizar la extension del archivo `.rda` o `.Rdata`; también se resalta que se puede utilizar la función `serialize()` para moestrar un objeto en forma binaria y asi guardar el 100% de lo que el objeto es, sin embargo si se desea guardar en un archivo para ello esta la función `save()` usada anteriormente
+```{r}
+ #guardar la funcion de los factores
+ dump(c("convertidorAfactores","estudio2"),file="convertidorayunestudio.R")
+ rm(convertidorAfactores) #removiendo los objeto
+ rm(estudio2)
+ # este codigo daria error al remover el objetoconvertidorAfactores
+```
+
+y leerlos mediante `source()`
+
+```{r}
+ source("convertidorayunestudio.R")
+ convertidorAfactores
+ head(estudio2,5)
+```
+
+Finalmente Podemos calcular cuanto tiempo tarda en ejecutarce todo este R markdown mediante la diferencia de tiempos mediante la función `Sys.time()`la cual *internamente* uso al inicio para crear un objeto llamado `horainical`al cual ahora le resto `hora final`, también se puede utilizar la función `difftime()`especificando las unidades en que queremos el resultado.
+
+```{r}
+ horafinal <- Sys.time()
+ horafinal-horainicial
+ difftime(horafinal,horainicial,units = "mins")
+```
+ 
+# Conclusiones
+
+- La herramienta de R como lenguaje para el desarrollo de ciencia de datos sin duda es muy poderosa, sin embargo claramente se debe tener un objetivo antes de realizar cualquier ejercicio, ya que aun asi se tenga tal herramienta, si no se sabe que hacer con los datos, pues no se puede realizar nada claramente, tal es lo que me sucedio de cierta forma al realizar el ejercicio, donde depronto si hubiese tenido objetivo diferente al se solo usar las funciones aprendidas, hubiese realizado alguna busqueda de datos mas completos, o utilizado herramientas mas potentes como otros paquetes, sin embargo como aclaré al comienzo, mi objetivo era solo utilizar en su mayor medida diferentes funciones y conceptos que aprendí en el curso, lo cual complete claramente, aun asi cabe resaltar que hay muchas cosas que no pude aplicar dada la naturaleza de los datos y demás factores.
